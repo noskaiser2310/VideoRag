@@ -59,6 +59,7 @@ class AgenticVideoRAGPipeline:
         self.visual_indexer = visual_indexer
         self.knowledge_indexer = knowledge_indexer
         self.dialogue_indexer = dialogue_indexer
+        self.graph_indexer = None
         self.llm_generator = llm_generator
         self.model_id = model_id
 
@@ -84,6 +85,14 @@ class AgenticVideoRAGPipeline:
                 logger.warning(
                     f"Neo4j connection failed. Is docker-compose running? {e}"
                 )
+
+        # Fallback Local Graph Indexer
+        try:
+            from movierag.indexing.graph_indexer import GraphIndexer
+            self.graph_indexer = GraphIndexer(index_dir="data/indexes")
+            self.graph_indexer.load()
+        except Exception as e:
+            logger.warning(f"Could not load local GraphIndexer fallback: {e}")
 
     def _init_llm_client(self):
         try:
@@ -256,6 +265,39 @@ class AgenticVideoRAGPipeline:
         # Let exceptions bubble up to the grading loop so they can be captured in thoughts
         return self.knowledge_indexer.search(query, k=k, movie_id=movie_id)
 
+    def query_graph(self, query: str) -> str:
+        """Run Graph search: Neo4j if available, otherwise local NetworkX."""
+        result_text = ""
+        # 1. Try Neo4j first
+        if self._neo4j_driver:
+            try:
+                # If the query is an actual Cypher query
+                if "MATCH" in query.upper() or "RETURN" in query.upper():
+                    # Neo4j 5.x compatible execute_query
+                    from neo4j import RoutingControl
+                    records, summary, keys = self._neo4j_driver.execute_query(
+                        query, routing_=RoutingControl.READ
+                    )
+                    if records:
+                        result_text = "\n".join([str(r.data()) for r in records[:5]])
+                        return f"Neo4j Results:\n{result_text}"
+                    return "Neo4j query returned no results."
+            except Exception as e:
+                logger.warning(f"Neo4j cypher execution failed: {e}. Falling back to local.")
+        
+        # 2. Fallback to Local NetworkX Graph Indexer
+        if getattr(self, "graph_indexer", None):
+            try:
+                res = self.graph_indexer.search(query, k=5)
+                if res:
+                    lines = [f"Clip: {r.get('clip_id')} | {r.get('text', '')[:100]}" for r in res]
+                    return "Local Graph Results:\n" + "\n".join(lines)
+                return "Local Graph query returned no results."
+            except Exception as e:
+                logger.warning(f"Local graph search failed: {e}")
+                
+        return "[Graph Database not connected or failed]"
+
     #  Node 5: Generate 
 
     def generate_answer(
@@ -396,6 +438,8 @@ class AgenticVideoRAGPipeline:
                 frame_results_all = []
                 extracted_frame_paths = []  # Keep actual video frames for VLM
                 movie_vote = {}  # majority voting: movie_id -> count
+                exact_match_movie = None
+                exact_match_score = 0.0
 
                 for pos in sample_positions:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, pos)
@@ -410,6 +454,11 @@ class AgenticVideoRAGPipeline:
                     frame_matches = self.retrieve_visual_by_image(tmp_f.name, k=3)
                     for m in frame_matches:
                         mid = getattr(m, "movie_id", "")
+                        score = getattr(m, "score", 0.0)
+                        if score >= 0.90 and not exact_match_movie:
+                            exact_match_movie = mid
+                            exact_match_score = score
+                            
                         movie_vote[mid] = movie_vote.get(mid, 0) + 1
                         frame_results_all.append(m)
                     extracted_frame_paths.append(tmp_f.name)  # Keep for VLM
@@ -427,23 +476,41 @@ class AgenticVideoRAGPipeline:
                             pass
 
                 if movie_vote:
-                    identified_movie = max(movie_vote, key=movie_vote.get)
-                    movie_title = identified_movie
-                    
+                    if exact_match_movie:
+                        identified_movie = exact_match_movie
+                        movie_title = identified_movie
+                        for r in frame_results_all:
+                            if getattr(r, "movie_id", "") == identified_movie:
+                                meta = getattr(r, "metadata", {})
+                                if isinstance(meta, dict) and "title" in meta:
+                                    movie_title = meta["title"]
+                                    break
+                        thoughts.append(
+                            f"⚡ Tín hiệu Video cực mạnh ({exact_match_score:.2f} > 0.90). Không xét majority vote: phim được nhận diện là **{movie_title}** ({identified_movie})"
+                        )
+                    else:
+                        identified_movie = max(movie_vote, key=movie_vote.get)
+                        movie_title = identified_movie
+                        
+                        for r in frame_results_all:
+                            if getattr(r, "movie_id", "") == identified_movie:
+                                meta = getattr(r, "metadata", {})
+                                if isinstance(meta, dict) and "title" in meta:
+                                    movie_title = meta["title"]
+                                    break
+                                    
+                        thoughts.append(
+                            f"🎩 Video Majority Voting: phim được nhận diện là **{movie_title}** ({identified_movie})"
+                        )
+
+                    # Deduplicate visual results
+                    seen_ids = set([getattr(x, "id", str(x)) for x in visual_results])
                     for r in frame_results_all:
                         if getattr(r, "movie_id", "") == identified_movie:
-                            meta = getattr(r, "metadata", {})
-                            if isinstance(meta, dict) and "title" in meta:
-                                movie_title = meta["title"]
                             _key = getattr(r, "id", str(r))
-                            if _key not in [
-                                getattr(x, "id", str(x)) for x in visual_results
-                            ]:
+                            if _key not in seen_ids:
                                 visual_results.append(r)
-
-                    thoughts.append(
-                        f" Video Majority Voting: phim được nhận diện là **{movie_title}** ({identified_movie})"
-                    )
+                                seen_ids.add(_key)
 
                     current_queries = [f"{contextualized} {movie_title}"]
                     # Use ACTUAL extracted video frame for VLM (not DB keyframe!)
@@ -464,19 +531,21 @@ class AgenticVideoRAGPipeline:
         elif image_path:
             thoughts.append(f"️ Tìm kiếm Visual gốc cho ảnh tải lên...")
             vr = self.retrieve_visual_by_image(image_path, k=5)
-            # Seed visual results
+            # Find exact matches (>0.90 score) to skip majority vote
+            exact_match_movie = None
+            exact_match_score = 0.0
+            
             for r in vr:
-                _key = getattr(r, "id", str(r))
-                if _key not in [getattr(x, "id", str(x)) for x in visual_results]:
-                    visual_results.append(r)
-            movie_vote = {}
-            for r in vr:
-                mid = getattr(r, "movie_id", "")
-                if mid:
-                    movie_vote[mid] = movie_vote.get(mid, 0) + 1
-            if movie_vote:
-                identified_movie = max(movie_vote, key=movie_vote.get)
+                score = getattr(r, "score", 0.0)
+                if score >= 0.90:
+                    exact_match_movie = getattr(r, "movie_id", "")
+                    exact_match_score = score
+                    break
+                    
+            if exact_match_movie:
+                identified_movie = exact_match_movie
                 movie_title = identified_movie
+                # Get proper title
                 for r in vr:
                     if getattr(r, "movie_id", "") == identified_movie:
                         meta = getattr(r, "metadata", {})
@@ -485,8 +554,35 @@ class AgenticVideoRAGPipeline:
                             break
                             
                 thoughts.append(
-                    f" Image Majority Voting: phim được nhận diện là **{movie_title}** ({identified_movie})"
+                    f"️ Tín hiệu Visual cực mạnh ({exact_match_score:.2f} > 0.90). Không xét majority vote: phim được nhận diện là **{movie_title}** ({identified_movie})"
                 )
+            else:
+                movie_vote = {}
+                for r in vr:
+                    mid = getattr(r, "movie_id", "")
+                    if mid:
+                        movie_vote[mid] = movie_vote.get(mid, 0) + 1
+                if movie_vote:
+                    identified_movie = max(movie_vote, key=movie_vote.get)
+                    movie_title = identified_movie
+                    for r in vr:
+                        if getattr(r, "movie_id", "") == identified_movie:
+                            meta = getattr(r, "metadata", {})
+                            if isinstance(meta, dict) and "title" in meta:
+                                movie_title = meta["title"]
+                                break
+                                
+                    thoughts.append(
+                        f" Image Majority Voting: phim được nhận diện là **{movie_title}** ({identified_movie})"
+                    )
+
+            # Seed visual results (deduplicate by id)
+            seen_ids = set([getattr(x, "id", str(x)) for x in visual_results])
+            for r in vr:
+                _key = getattr(r, "id", str(r))
+                if _key not in seen_ids:
+                    visual_results.append(r)
+                    seen_ids.add(_key)
 
         #  Step 2.6: Extract enriched metadata from FAISS matched shots 
         matched_shots_context = ""
@@ -1262,7 +1358,7 @@ class AgenticVideoRAGPipeline:
                 return "[dialogue index not available]"
             elif tool_name == "query_graph":
                 if hasattr(self, "query_graph"):
-                    cypher = tool_args.get("query", q_arg)
+                    cypher = str(tool_args.get("query", q_arg) or "")
                     thoughts.append(f" Kimi called query_graph('{cypher}')")
                     return str(self.query_graph(cypher))
                 return "[Graph Database not connected]"

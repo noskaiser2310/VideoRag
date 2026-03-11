@@ -18,182 +18,285 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 CUSTOM_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* Reset & Base */
+/* ── Reset ─────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 body, .gradio-container {
-  background: #0b0d14 !important;
+  background: #060810 !important;
   font-family: 'Inter', 'Segoe UI', sans-serif !important;
-  color: #dde1f0 !important;
+  color: #d4d8f0 !important;
   margin: 0 !important;
 }
 
-/* App wrapper */
-#app-root { max-width: 1200px; margin: 0 auto; padding: 16px; }
+/* ── Animated gradient background ────────────── */
+.gradio-container::before {
+  content: '';
+  position: fixed;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(ellipse at 20% 20%, rgba(99,102,241,.07) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 80%, rgba(167,139,250,.05) 0%, transparent 50%),
+              radial-gradient(ellipse at 50% 0%,  rgba(244,114,182,.04) 0%, transparent 40%);
+  animation: bgPulse 12s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+@keyframes bgPulse { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.05) rotate(2deg); } }
 
-/* Header */
+/* ── App wrapper ─────────────────────────────── */
+#app-root { max-width: 1280px; margin: 0 auto; padding: 16px; position: relative; z-index: 1; }
+
+/* ── Header ──────────────────────────────────── */
 .mr-header {
-  background: linear-gradient(135deg, #13172e 0%, #0d1028 100%);
-  border: 1px solid rgba(99,102,241,.25);
-  border-radius: 14px;
-  padding: 18px 24px 14px;
-  margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(19,23,62,.95) 0%, rgba(13,16,40,.95) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 18px;
+  padding: 22px 28px 18px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
 }
-.mr-header h1 { margin: 0; font-size: 1.5rem; font-weight: 700; }
-.mr-header p { margin: 2px 0 0; font-size: .78rem; color: #7c85c0; }
-.grad { background: linear-gradient(90deg,#818cf8,#a78bfa,#f472b6);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.mr-header::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #6366f1, #a78bfa, #f472b6, #a78bfa, #6366f1);
+  background-size: 200% 100%;
+  animation: shimmer 4s linear infinite;
+}
+@keyframes shimmer { from { background-position: 0% 0%; } to { background-position: 200% 0%; } }
+.mr-header h1 { margin: 0; font-size: 1.65rem; font-weight: 800; letter-spacing: -0.5px; }
+.mr-header p { margin: 4px 0 0; font-size: .8rem; color: #6b7bbf; letter-spacing: 0.2px; }
+.grad {
+  background: linear-gradient(90deg,#818cf8,#a78bfa,#f472b6);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.badge {
+  display: inline-block;
+  font-size: .65rem; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(99,102,241,.15);
+  border: 1px solid rgba(99,102,241,.3);
+  color: #a5b4fc;
+  letter-spacing: .5px;
+  vertical-align: middle;
+  margin-left: 8px;
+}
 
-/* Main layout */
-.main-col { display: flex; flex-direction: column; gap: 10px; }
+/* ── Main col ────────────────────────────────── */
+.main-col { display: flex; flex-direction: column; gap: 12px; }
 
-/* Chatbot */
+/* ── Chatbot ─────────────────────────────────── */
 #chatbot {
-  background: #0f1219 !important;
-  border: 1px solid rgba(99,102,241,.2) !important;
-  border-radius: 12px !important;
-  min-height: 440px !important;
+  background: rgba(11,14,25,.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(99,102,241,.18) !important;
+  border-radius: 16px !important;
+  min-height: 460px !important;
 }
+
 /* chat bubbles */
 .message.user .message-bubble-border {
   background: linear-gradient(135deg,#4338ca,#6366f1) !important;
   border-radius: 18px 18px 4px 18px !important;
+  box-shadow: 0 4px 20px rgba(99,102,241,.25) !important;
 }
 .message.bot .message-bubble-border {
-  background: #161b2e !important;
-  border: 1px solid rgba(99,102,241,.18) !important;
+  background: rgba(22,27,58,.9) !important;
+  border: 1px solid rgba(99,102,241,.2) !important;
   border-radius: 18px 18px 18px 4px !important;
+  backdrop-filter: blur(8px);
+}
+.message.bot .message-bubble-border details summary {
+  cursor: pointer;
+  color: #a5b4fc;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 4px 0;
 }
 
-/* Chat input bar */
+/* ── Chat input bar ──────────────────────────── */
 #chat-bar {
-  background: #161b2e !important;
-  border: 1.5px solid rgba(99,102,241,.3) !important;
-  border-radius: 14px !important;
-  padding: 6px 8px !important;
+  background: rgba(22,27,58,.85) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1.5px solid rgba(99,102,241,.25) !important;
+  border-radius: 16px !important;
+  padding: 8px 10px !important;
   display: flex !important;
   align-items: flex-end !important;
-  gap: 6px !important;
-  transition: border-color .2s;
+  gap: 8px !important;
+  transition: border-color .25s, box-shadow .25s;
 }
-#chat-bar:focus-within { border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,.12) !important; }
+#chat-bar:focus-within {
+  border-color: rgba(99,102,241,.6) !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.1), 0 8px 32px rgba(0,0,0,.4) !important;
+}
 #chat-txt textarea {
   background: transparent !important;
   border: none !important;
   color: #e2e8f0 !important;
-  font-size: .92rem !important;
+  font-size: .93rem !important;
   resize: none !important;
   padding: 6px 4px !important;
+  line-height: 1.5;
 }
+#chat-txt textarea::placeholder { color: #4a5275 !important; }
 
-/* upload mini-buttons inside bar */
-.upload-btn {
-  background: rgba(99,102,241,.12) !important;
-  border: 1px solid rgba(99,102,241,.25) !important;
-  border-radius: 9px !important;
-  color: #a5b4fc !important;
-  font-size: .75rem !important;
-  padding: 5px 10px !important;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .15s;
-}
-.upload-btn:hover { background: rgba(99,102,241,.25) !important; }
-
-/* hidden large upload areas – only shown when toggled */
+/* hidden upload areas */
 #img-drop, #vid-drop {
-  border: 1.5px dashed rgba(99,102,241,.3) !important;
-  border-radius: 10px !important;
-  background: #11152a !important;
-  padding: 8px !important;
+  border: 1.5px dashed rgba(99,102,241,.25) !important;
+  border-radius: 12px !important;
+  background: rgba(11,14,25,.6) !important;
+  transition: border-color .2s;
 }
+#img-drop:hover, #vid-drop:hover { border-color: rgba(99,102,241,.5) !important; }
 
+/* ── Buttons ─────────────────────────────────── */
 #send-btn {
   background: linear-gradient(135deg,#4f46e5,#7c3aed) !important;
-  border: none !important; border-radius: 10px !important;
-  font-weight: 650 !important; font-size: .9rem !important;
-  padding: 8px 18px !important; white-space: nowrap;
-  transition: transform .15s, box-shadow .15s;
+  border: none !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: .9rem !important;
+  padding: 9px 20px !important;
+  white-space: nowrap;
+  transition: transform .15s, box-shadow .2s, filter .2s;
+  box-shadow: 0 4px 16px rgba(99,102,241,.3);
 }
-#send-btn:hover { transform: scale(1.04); box-shadow: 0 4px 20px rgba(99,102,241,.4) !important; }
+#send-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 6px 28px rgba(99,102,241,.55) !important;
+  filter: brightness(1.1);
+}
+#send-btn:active { transform: scale(.97); }
 
-/* Status strip */
+#new-chat-btn {
+  background: rgba(255,255,255,.04) !important;
+  border: 1px solid rgba(255,255,255,.1) !important;
+  border-radius: 12px !important;
+  color: #7c85c0 !important;
+  font-size: .85rem !important;
+  padding: 9px 14px !important;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+#new-chat-btn:hover { background: rgba(255,255,255,.09) !important; color: #a5b4fc !important; }
+
+#clear-btn {
+  background: rgba(239,68,68,.07) !important;
+  border: 1px solid rgba(239,68,68,.2) !important;
+  color: #fca5a5 !important;
+  border-radius: 10px !important;
+  font-size: .78rem !important;
+  transition: background .15s;
+}
+#clear-btn:hover { background: rgba(239,68,68,.15) !important; }
+
+/* ── Status strip ────────────────────────────── */
 #status-txt {
   background: transparent !important;
   border: none !important;
-  border-top: 1px solid rgba(99,102,241,.1) !important;
+  border-top: 1px solid rgba(99,102,241,.08) !important;
   border-radius: 0 !important;
   font-size: .72rem !important;
-  color: #6b7bbf !important;
-  padding: 2px 4px !important;
+  color: #4a5275 !important;
+  padding: 4px 2px !important;
 }
-#status-txt textarea { color: #6b7bbf !important; font-size: .72rem !important; padding: 0 !important; }
+#status-txt textarea { color: #4a5275 !important; font-size: .72rem !important; padding: 0 !important; }
 
-/* Evidence Accordion */
-.evidence-accordion {
-  background: #0f1219 !important;
-  border: 1px solid rgba(99,102,241,.2) !important;
-  border-radius: 12px !important;
+/* ── Right Panel ─────────────────────────────── */
+.evidence-panel {
+  background: rgba(11,14,25,.7) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99,102,241,.18) !important;
+  border-radius: 16px !important;
+  padding: 14px;
   overflow: hidden;
 }
-.evidence-accordion .label-wrap {
-  background: linear-gradient(90deg,rgba(99,102,241,.12),transparent) !important;
-  padding: 8px 14px !important;
-  font-size: .78rem !important;
-  font-weight: 600 !important;
-  color: #a5b4fc !important;
-  letter-spacing: .5px;
+.panel-title {
+  font-size: .68rem;
+  color: #4a5275;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin: 0 0 8px;
 }
 
-/* Gallery compact */
-#gallery {
-  background: #0f1219 !important;
-  border-radius: 0 0 10px 10px !important;
-}
-.gallery-item img {
-  border-radius: 7px !important;
-  cursor: zoom-in !important;
-  transition: transform .2s, box-shadow .2s !important;
-}
-.gallery-item img:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(99,102,241,.35) !important; }
-
-/* Video compact */
-#vid-player { border-radius: 0 0 10px 10px !important; }
-#vid-player video { border-radius: 8px !important; }
-
-/* Tabs */
-.tab-nav { background: #0f1219 !important; border-bottom: 1px solid rgba(99,102,241,.18) !important; }
-.tab-nav button { color: #7c85c0 !important; font-size: .78rem !important; padding: 7px 14px !important; }
-.tab-nav button.selected { color: #a5b4fc !important; border-bottom: 2px solid #6366f1 !important; }
-
-/* Clear btn */
-#clear-btn {
-  background: rgba(239,68,68,.08) !important;
-  border: 1px solid rgba(239,68,68,.2) !important;
-  color: #fca5a5 !important; border-radius: 8px !important;
-  font-size: .75rem !important;
-}
-#clear-btn:hover { background: rgba(239,68,68,.18) !important; }
-
-/* Media Accordion */
+/* ── Accordion ───────────────────────────────── */
 #media-acc {
-  background: transparent !important;
-  border: 1px dashed rgba(99,102,241,.25) !important;
-  border-radius: 8px !important;
-  margin-top: 8px !important;
+  background: rgba(11,14,25,.5) !important;
+  border: 1px dashed rgba(99,102,241,.2) !important;
+  border-radius: 12px !important;
+  margin-top: 10px !important;
+  transition: border-color .2s;
 }
-#media-acc > .label-wrap {
+#media-acc:hover { border-color: rgba(99,102,241,.4) !important; }
+#media-acc > .label-wrap { color: #6b7bbf !important; font-size: 0.82rem !important; }
+
+/* ── Gallery ─────────────────────────────────── */
+#gallery { background: transparent !important; border-radius: 0 0 12px 12px !important; }
+.gallery-item img {
+  border-radius: 10px !important;
+  cursor: zoom-in !important;
+  transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s !important;
+}
+.gallery-item img:hover {
+  transform: scale(1.07) !important;
+  box-shadow: 0 8px 30px rgba(99,102,241,.4) !important;
+}
+
+/* ── Video player ────────────────────────────── */
+#vid-player { border-radius: 0 0 12px 12px !important; overflow: hidden; }
+#vid-player video { border-radius: 10px !important; }
+
+/* ── Tabs ────────────────────────────────────── */
+.tab-nav {
+  background: rgba(11,14,25,.6) !important;
+  border-bottom: 1px solid rgba(99,102,241,.15) !important;
+  border-radius: 10px 10px 0 0;
+  padding: 0 4px;
+}
+.tab-nav button {
+  color: #4a5275 !important;
+  font-size: .8rem !important;
+  padding: 8px 16px !important;
+  border-radius: 8px 8px 0 0;
+  transition: color .2s, background .2s;
+  font-weight: 500;
+}
+.tab-nav button:hover { color: #7c85c0 !important; }
+.tab-nav button.selected {
   color: #a5b4fc !important;
-  font-size: 0.85rem !important;
+  border-bottom: 2px solid #6366f1 !important;
+  background: rgba(99,102,241,.08) !important;
 }
 
-/* Examples */
-.examples .example { background: #161b2e !important; border: 1px solid rgba(99,102,241,.18) !important; border-radius: 8px !important; font-size:.8rem !important; }
-.examples .example:hover { border-color: #6366f1 !important; }
+/* ── Examples ────────────────────────────────── */
+.examples .example {
+  background: rgba(22,27,58,.6) !important;
+  border: 1px solid rgba(99,102,241,.15) !important;
+  border-radius: 10px !important;
+  font-size: .8rem !important;
+  transition: border-color .15s, background .15s;
+  backdrop-filter: blur(4px);
+}
+.examples .example:hover {
+  border-color: rgba(99,102,241,.4) !important;
+  background: rgba(22,27,58,.9) !important;
+}
 
-/* scrollbar */
-::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: #2d3455; border-radius: 99px; }
+/* ── Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e2440; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #2d3455; }
 """
 
 
@@ -204,7 +307,7 @@ def create_integrated_app(pipeline=None):
   # Backend 
   def respond(user_message, image_input, video_input, chat_history):
     if not user_message and image_input is None and video_input is None:
-      return chat_history, [], None, "️ Ready"
+      return chat_history, [], None, "⏳ Ready"
 
       chat_history = chat_history + [
         {"role": "user", "content": user_message or "Media"},
@@ -271,7 +374,7 @@ def create_integrated_app(pipeline=None):
     bot_msg += clean_answer + "\n"
 
     if knowledge_results:
-      bot_msg += "\n---\n**Sources:**\n"
+      bot_msg += "\n---\n📚 **Sources:**\n"
       for i, r in enumerate(knowledge_results[:3]):
         try:
           meta = getattr(r, "metadata", r)
@@ -286,7 +389,7 @@ def create_integrated_app(pipeline=None):
           bot_msg += f"`[{i + 1}]` [Ref]\n"
 
     if visual_results:
-      bot_msg += "\n**Matched Frames:**\n"
+      bot_msg += "\n🖼️ **Matched Frames:**\n"
       for i, r in enumerate(visual_results[:5]):
         try:
           meta = getattr(r, "metadata", r)
@@ -354,8 +457,8 @@ def create_integrated_app(pipeline=None):
     # Header 
     gr.HTML("""
     <div class="mr-header">
-     <h1> <span class="grad">MovieRAG</span></h1>
-     <p>Agentic VideoRAG · Kimi K2 + CLIP + FAISS · Multi-round Retrieval</p>
+      <h1>🎬 <span class="grad">MovieRAG</span> <span class="badge">v2.0</span></h1>
+      <p>Agentic VideoRAG · Kimi K2 + CLIP FAISS · Multi-round Retrieval · GraphRAG</p>
     </div>
     """)
 
@@ -372,7 +475,7 @@ def create_integrated_app(pipeline=None):
         with gr.Group(elem_id="chat-bar"):
           with gr.Row():
             txt = gr.Textbox(
-              placeholder="Hỏi về phim... hoặc upload ảnh/video bên dưới",
+              placeholder="💬 Hỏi về phim... hoặc upload ảnh/video bên dưới",
               show_label=False,
               scale=1,
               container=False,
@@ -380,17 +483,17 @@ def create_integrated_app(pipeline=None):
               lines=1,
             )
             send = gr.Button(
-              "",
+              "🔍 Tìm",
               variant="primary",
               scale=0,
-              min_width=50,
+              min_width=70,
               elem_id="send-btn",
             )
             new_chat = gr.Button(
-              "",
+              "🗑️ Mới",
               variant="secondary",
               scale=0,
-              min_width=50,
+              min_width=60,
               elem_id="new-chat-btn",
             )
 
@@ -417,12 +520,12 @@ def create_integrated_app(pipeline=None):
               )
             with gr.Row():
               clear = gr.Button(
-                "️ Xóa Media Đính Kèm", size="sm", elem_id="clear-btn"
+                "🗑️ Xóa Media Đính Kèm", size="sm", elem_id="clear-btn"
               )
 
         # Status strip
         status = gr.Textbox(
-          value="️ Ready",
+          value="✨ Ready",
           label="",
           interactive=False,
           max_lines=1,
@@ -431,12 +534,13 @@ def create_integrated_app(pipeline=None):
 
         # Examples 
         gr.Examples(
-          label=" Examples",
+          label="💡 Try These",
           examples=[
             ["Ai đóng vai Jack trong Titanic?", None, None],
             ["Tìm cảnh con tàu Titanic chìm", None, None],
-            ["Tóm tắt phim Home Alone", None, None],
-            ["Tìm cảnh rượt đuổi xe hơi", None, None],
+            ["Tóm tắt nội dung phim Home Alone", None, None],
+            ["Tìm cảnh rượt đuổi xe hơi kịch tính", None, None],
+            ["Cảnh kết thúc của Crazy Stupid Love", None, None],
           ],
           inputs=[txt, img, vid],
         )
@@ -444,11 +548,11 @@ def create_integrated_app(pipeline=None):
       # RIGHT: Evidence 
       with gr.Column(scale=3, elem_classes="main-col"):
         gr.HTML(
-          '<p style="font-size:.72rem;color:#6b7bbf;text-transform:uppercase;letter-spacing:.8px;margin:2px 0 6px"> Visual Evidence</p>'
+          '<p class="panel-title">🎞 Visual Evidence</p>'
         )
 
         with gr.Tabs():
-          with gr.Tab("️ Keyframes"):
+          with gr.Tab("🖼️ Keyframes"):
             gallery = gr.Gallery(
               label="",
               elem_id="gallery",
@@ -459,7 +563,7 @@ def create_integrated_app(pipeline=None):
               show_label=False,
             )
 
-          with gr.Tab(" Clip"):
+          with gr.Tab("🎬 Clip"):
             video_player = gr.Video(
               label="",
               elem_id="vid-player",
